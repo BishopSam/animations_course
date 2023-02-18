@@ -20,6 +20,48 @@ class MyApp extends StatelessWidget {
   }
 }
 
+enum CircleSide { left, right }
+
+extension ToPath on CircleSide {
+  Path toPath(Size size) {
+    final path = Path();
+    late Offset offset;
+    late bool clockWise;
+
+    switch (this) {
+      case CircleSide.left:
+        path.moveTo(size.width, 0);
+        offset = Offset(size.width, size.height);
+        clockWise = false;
+        break;
+      case CircleSide.right:
+        offset = Offset(0, size.height);
+        clockWise = true;
+        break;
+      default:
+    }
+
+    path.arcToPoint(offset,
+        radius: Radius.elliptical(size.width / 2, size.height / 2),
+        clockwise: clockWise);
+
+    path.close();
+    return path;
+  }
+}
+
+class HalfCircleClipper extends CustomClipper<Path> {
+  final CircleSide side;
+  HalfCircleClipper({
+    required this.side,
+  });
+  @override
+  Path getClip(Size size) => side.toPath(size);
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => true;
+}
+
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
 
@@ -53,31 +95,36 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, _) {
-              return Transform(
-                alignment: Alignment.center,
-                transform: Matrix4.identity()..rotateY(_animation.value),
-                child: Container(
-                  height: 100,
-                  width: 100,
-                  decoration: BoxDecoration(
-                      color: Colors.blue,
-                      borderRadius: BorderRadius.circular(10),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.5),
-                          spreadRadius: 5,
-                          blurRadius: 7,
-                          offset: const Offset(0, 3),
-                        )
-                      ]),
-                ),
-              );
-            }),
-      ),
-    );
+        body: SafeArea(
+      child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            return Transform(
+              transform: Matrix4.identity()..rotateZ(_animation.value),
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ClipPath(
+                    clipper: HalfCircleClipper(side: CircleSide.left),
+                    child: Container(
+                      height: 100,
+                      width: 100,
+                      color: const Color(0xff0057b7),
+                    ),
+                  ),
+                  ClipPath(
+                    clipper: HalfCircleClipper(side: CircleSide.right),
+                    child: Container(
+                      height: 100,
+                      width: 100,
+                      color: const Color(0xffffd700),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+    ));
   }
 }
