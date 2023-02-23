@@ -62,6 +62,10 @@ class HalfCircleClipper extends CustomClipper<Path> {
   bool shouldReclip(covariant CustomClipper<Path> oldClipper) => true;
 }
 
+extension on VoidCallback {
+  Future<void> delayed(Duration duration) => Future.delayed(duration, this);
+}
+
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
 
@@ -70,61 +74,137 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
+  late AnimationController _counterClockWiseRotationController;
+  late Animation<double> _counterClockWiseRotationAnimation;
+
+  late AnimationController _flipController;
+  late Animation<double> _flipAnimation;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+    _counterClockWiseRotationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    );
+
+    _counterClockWiseRotationAnimation = Tween<double>(begin: 0, end: -(pi / 2))
+        .animate(CurvedAnimation(
+            parent: _counterClockWiseRotationController,
+            curve: Curves.bounceOut));
+
+    _flipController = AnimationController(
       vsync: this,
       duration: const Duration(
-        seconds: 2,
+        seconds: 1,
       ),
     );
-    _animation = Tween<double>(begin: 0.0, end: 2 * pi).animate(_controller);
-    _controller.repeat();
+
+    _flipAnimation = Tween<double>(begin: 0, end: pi).animate(
+      CurvedAnimation(
+        parent: _flipController,
+        curve: Curves.bounceOut,
+      ),
+    );
+
+    // status listener
+    _counterClockWiseRotationController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _flipAnimation = Tween<double>(
+          begin: _flipAnimation.value,
+          end: _flipAnimation.value + pi,
+        ).animate(CurvedAnimation(
+          parent: _flipController,
+          curve: Curves.bounceOut,
+        ));
+
+        _flipController
+          ..reset()
+          ..forward();
+      }
+    });
+
+    _flipController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _counterClockWiseRotationAnimation = Tween<double>(
+          begin: _counterClockWiseRotationAnimation.value,
+          end: _counterClockWiseRotationAnimation.value + -(pi / 2),
+        ).animate(CurvedAnimation(
+          parent: _counterClockWiseRotationController,
+          curve: Curves.bounceOut,
+        ));
+        _counterClockWiseRotationController
+          ..reset()
+          ..forward();
+      }
+    });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _counterClockWiseRotationController.dispose();
+    _flipController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    _counterClockWiseRotationController
+      ..reset()
+      ..forward.delayed(const Duration(seconds: 1));
+
     return Scaffold(
-        body: SafeArea(
-      child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, _) {
-            return Transform(
-              transform: Matrix4.identity()..rotateZ(_animation.value),
-              alignment: Alignment.center,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ClipPath(
-                    clipper: HalfCircleClipper(side: CircleSide.left),
-                    child: Container(
-                      height: 100,
-                      width: 100,
-                      color: const Color(0xff0057b7),
-                    ),
-                  ),
-                  ClipPath(
-                    clipper: HalfCircleClipper(side: CircleSide.right),
-                    child: Container(
-                      height: 100,
-                      width: 100,
-                      color: const Color(0xffffd700),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-    ));
+      body: SafeArea(
+        child: AnimatedBuilder(
+            animation: _counterClockWiseRotationController,
+            builder: (context, _) {
+              return Transform(
+                alignment: Alignment.center,
+                transform: Matrix4.identity()
+                  ..rotateZ(_counterClockWiseRotationAnimation.value),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    AnimatedBuilder(
+                        animation: _flipAnimation,
+                        builder: (context, _) {
+                          return Transform(
+                            alignment: Alignment.centerRight,
+                            transform: Matrix4.identity()
+                              ..rotateY(_flipAnimation.value),
+                            child: ClipPath(
+                              clipper: HalfCircleClipper(side: CircleSide.left),
+                              child: Container(
+                                height: 100,
+                                width: 100,
+                                color: const Color(0xff0057b7),
+                              ),
+                            ),
+                          );
+                        }),
+                    AnimatedBuilder(
+                        animation: _flipAnimation,
+                        builder: (context, _) {
+                          return Transform(
+                            transform: Matrix4.identity()
+                              ..rotateY(_flipAnimation.value),
+                            alignment: Alignment.centerLeft,
+                            child: ClipPath(
+                              clipper:
+                                  HalfCircleClipper(side: CircleSide.right),
+                              child: Container(
+                                height: 100,
+                                width: 100,
+                                color: const Color(0xffffd700),
+                              ),
+                            ),
+                          );
+                        }),
+                  ],
+                ),
+              );
+            }),
+      ),
+    );
   }
 }
